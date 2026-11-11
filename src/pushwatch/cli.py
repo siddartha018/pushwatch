@@ -44,7 +44,7 @@ def _annotate(findings: list[Finding]) -> None:
     """GitHub Actions workflow commands, so findings show on the diff."""
     for f in findings:
         level = "error" if f.severity == "high" else "warning"
-        loc = f"file={f.path}" + (f",line={f.line}" if f.line else "")
+        loc = f"file={f.path},line={f.line or 1}"  # whole-file findings point at line 1 so they show on the diff
         msg = f"{f.title}: {f.evidence}".replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
         print(f"::{level} {loc},title=pushwatch {f.rule}::{msg}")
 
