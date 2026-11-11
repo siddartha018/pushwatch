@@ -93,11 +93,22 @@ def show_padding(line: str, m: re.Match) -> str:
 
 CODE_EXT = {".js", ".mjs", ".cjs", ".jsx", ".ts", ".mts", ".cts", ".tsx", ".py", ".json", ".sh", ".ps1",
             ".bat", ".cmd", ".vue", ".svelte", ".astro", ".rb", ".php", ".go", ".rs", ".java", ".kt", ".swift"}
-BUILD_CONFIG = re.compile(
-    r"(^|/)(postcss|vite|vitest|babel|next|webpack|tailwind|eslint|rollup|metro|nuxt|astro|svelte|jest|"
-    r"tsup|esbuild|craco|gatsby-config|quasar|remix|playwright|prettier)(\.config)?\.(js|mjs|cjs|ts|mts|cts)$"
+# A project's own build configs. ".config" is required: a library file such as
+# node_modules/prettier/plugins/babel.js is not a config, and vendored folders are skipped.
+_BUILD_CONFIG = re.compile(
+    r"(^|/)((postcss|vite|vitest|babel|next|webpack|tailwind|eslint|rollup|metro|nuxt|astro|svelte|jest|"
+    r"tsup|esbuild|craco|quasar|remix|playwright|prettier)\.config|gatsby-config|gatsby-node)\.(js|mjs|cjs|ts|mts|cts)$"
     r"|(^|/)\.(babelrc|eslintrc|prettierrc)\.(js|cjs)$"
 )
+VENDORED = re.compile(r"(^|/)(node_modules|vendor|bower_components|\.pnpm|third_party)/")
+
+
+class _BuildConfig:
+    def search(self, path: str):
+        return None if VENDORED.search(path) else _BUILD_CONFIG.search(path)
+
+
+BUILD_CONFIG = _BuildConfig()
 PAD = re.compile(r"[ \t  -​　]{200,}")
 # Calls that run code: matched only outside string literals ("spawn() from x" in a label is not a call).
 EXEC_CODE = re.compile(r"\beval\s*\(|new\s+Function\s*\(|\bexecSync\s*\(|\bspawn(Sync)?\s*\(|process\.binding\s*\(|\bFunction\s*\(")

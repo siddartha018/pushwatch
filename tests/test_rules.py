@@ -139,3 +139,17 @@ def test_gitignore_line_ending_rewrite_is_not_a_removal():
 
 def test_deleted_files_are_not_scanned():
     assert scan_change(FileChange(".vscode/tasks.json", "D", old=TASKS.encode(), new=None)) == []
+
+
+def test_library_files_in_node_modules_are_not_build_configs():
+    # found by auditing real repositories that commit node_modules: two false alarms, now fixed
+    lib = "const { SHARE_ENV, Worker } = require(\"node:worker_threads\");\nvar f = new Function(\"m\", \"return import(m)\");\n"
+    assert scan_change(fc("node_modules/.pnpm/eslint@9.39.1/node_modules/eslint/lib/eslint/eslint.js", lib)) == []
+    assert scan_change(fc("node_modules/prettier/plugins/babel.js", lib)) == []
+    assert scan_change(fc("node_modules/jiti/dist/babel.js", "x" * 1500)) == []
+
+
+def test_real_config_names_still_match():
+    bad = "module.exports = {};" + PAD + "console.log(1)"
+    for name in ("babel.config.js", "vite.config.ts", "postcss.config.mjs", "apps/web/next.config.js", ".eslintrc.js"):
+        assert "config-injection" in rules(scan_change(fc(name, bad)), HIGH), name

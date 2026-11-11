@@ -6,7 +6,6 @@ __pycache__/
 bench/results*.json
 
 # --- snapshot hygiene 2026-11-12 ---
-.env*
 !.env.example
 .vercel
 .vercel-bundle
@@ -29,3 +28,4 @@ venv/
 coverage/
 *.tsbuildinfo
 *.log
+config.bat
