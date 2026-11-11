@@ -2,11 +2,21 @@ name: pushwatch
 description: Catch malicious code in pushes and pull requests before it runs (VS Code autorun tasks, scripts disguised as fonts, code hidden in build configs, rewritten history).
 branding:
   icon: shield
-  color: blue
+  color: red
 inputs:
   fail-on:
-    description: Lowest severity that fails the check (high, medium or low)
-    default: high
+    description: Lowest severity that fails the check (high, medium or low). Default: fail_on in .pushwatch.toml, else high.
+    default: ""
+  comment:
+    description: Post one pull request comment with the findings, updated on every push (needs pull-requests write).
+    default: "false"
+  sarif:
+    description: Upload findings to the repository's Security tab as code scanning alerts (needs security-events write).
+    default: "false"
+outputs:
+  result:
+    description: clean, warnings or blocked
+    value: ${{ steps.scan.outputs.result }}
 runs:
   using: composite
   steps:
@@ -21,5 +31,43 @@ runs:
       shell: bash
       run: python3 -m pip install --quiet --disable-pip-version-check "${{ github.action_path }}"
     - name: Scan
+      id: scan
       shell: bash
-      run: pushwatch --fail-on "${{ inputs.fail-on }}" github
+      run: |
+        set +e
+        args=()
+        [ -n "${{ inputs.fail-on }}" ] && args+=(--fail-on "${{ inputs.fail-on }}")
+        pushwatch "${args[@]}" --sarif "$RUNNER_TEMP/pushwatch.sarif" --summary-file "$RUNNER_TEMP/pushwatch.md" github
+        code=$?
+        if [ $code -eq 0 ]; then
+          grep -q "passed with warnings" "$RUNNER_TEMP/pushwatch.md" 2>/dev/null && echo "result=warnings" >> "$GITHUB_OUTPUT" || echo "result=clean" >> "$GITHUB_OUTPUT"
+        else
+          echo "result=blocked" >> "$GITHUB_OUTPUT"
+        fi
+        echo "code=$code" >> "$GITHUB_OUTPUT"
+    - name: Comment on the pull request
+      if: inputs.comment == 'true' && github.event.pull_request.number
+      shell: bash
+      continue-on-error: true  # fork pull requests get a read-only token
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        body="$RUNNER_TEMP/pushwatch.md"
+        [ -s "$body" ] || exit 0
+        id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[] | select(.body | startswith("<!-- pushwatch -->")) | .id' | head -1)
+        if [ -n "$id" ]; then
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$id" -F body=@"$body" > /dev/null
+        else
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -F body=@"$body" > /dev/null
+        fi
+    - name: Upload to code scanning
+      if: inputs.sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      continue-on-error: true
+      with:
+        sarif_file: ${{ runner.temp }}/pushwatch.sarif
+        category: pushwatch
+    - name: Enforce
+      shell: bash
+      run: exit ${{ steps.scan.outputs.code }}

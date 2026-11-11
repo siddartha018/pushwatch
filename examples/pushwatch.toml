@@ -1,0 +1,7 @@
+# .pushwatch.toml: team settings, read from the base branch (never from the change being scanned).
+fail_on = "high"
+
+[[allow]]
+rule = "install-hook"
+path = "package.json"
+reason = "husky installs git hooks in prepare"

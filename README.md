@@ -61,18 +61,23 @@ The corpus is live malware in private repositories, so it is not published. `ben
 | `blockchain-lookup` | high / low | Reading blockchain transactions (a way to hide a malware server's address); high inside build configs |
 | `gitignore-secrets` | medium | `.gitignore` stops ignoring `.env`, keys or credentials |
 | `gitignore-hides-tooling` | medium | `.gitignore` starts hiding `.bat` files or known auto-push tooling |
+| `config-change` | medium | `.pushwatch.toml` loosened: a new exception or a higher fail level |
 | rewritten history | high | A force-push replaces a commit with one that has the same message and author date but different files |
 
 Only lines a commit **adds** count, so the commit that cleans up a payload is never flagged. When a high finding sits under a message like "Update README.md", the report says the message doesn't match the change.
 
 ## Use it
 
-As a GitHub Action, in `.github/workflows/pushwatch.yml`:
+### In one repository
+
+`.github/workflows/pushwatch.yml`:
 
 ```yaml
 on: [push, pull_request]
 permissions:
   contents: read
+  pull-requests: write    # the summary comment
+  security-events: write  # Security tab alerts
 jobs:
   scan:
     runs-on: ubuntu-latest
@@ -80,12 +85,55 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: siddartha018/pushwatch@main
+      - uses: siddartha018/pushwatch@v1
+        with:
+          comment: true   # one comment per pull request, updated on every push
+          sarif: true     # alerts in the repository's Security tab
 ```
 
-Findings appear as annotations on the diff and as a job summary, and the check fails on anything high. Use `fail-on: medium` for a stricter check. On a force-push the action fetches the commit that was replaced, so it can compare the two.
+Every finding is annotated on its line of the diff and listed in the job summary. The check fails on anything high, and `fail-on: medium` makes it stricter. After a force-push, the action fetches the commit that was replaced so it can compare the two.
 
-From the command line (Python 3.13, no dependencies):
+### Across a team or an organization
+
+The reusable workflow makes each repository a five-line file:
+
+```yaml
+on: [push, pull_request]
+jobs:
+  pushwatch:
+    uses: siddartha018/pushwatch/.github/workflows/scan.yml@v1
+    permissions: { contents: read, pull-requests: write, security-events: write }
+```
+
+On GitHub Team or Enterprise, an organization ruleset can require that workflow on every repository, so new repositories are covered without anyone remembering to add it. Mark the `scan` check as required in branch protection and a flagged pull request can't be merged.
+
+Before rolling it out, audit what is already there:
+
+```bash
+pushwatch audit --owner my-org             # the tip of every branch of every repository: anything live
+pushwatch audit --owner my-org --history   # also every commit: when each payload arrived, and if it was cleaned up
+```
+
+The audit lists repositories through the `gh` CLI, so it covers exactly what the signed-in account can see. It keeps bare mirrors in `~/.cache/pushwatch` and never checks anything out. Branch tips matter most, because cleanups usually fix the default branch and miss the others.
+
+### Team settings
+
+`.pushwatch.toml` holds known-safe exceptions, and every exception needs a reason:
+
+```toml
+fail_on = "high"
+
+[[allow]]
+rule = "install-hook"
+path = "package.json"
+reason = "husky installs git hooks in prepare"
+```
+
+The settings are read from the **base** of a pull request or the commit **before** a push, never from the change being scanned. A malicious push can't bring its own exception. A change that loosens the settings is reported (`config-change`) and only takes effect once a reviewer merges it.
+
+### From the command line
+
+Python 3.13, no dependencies:
 
 ```bash
 uv tool install git+https://github.com/siddartha018/pushwatch
@@ -94,10 +142,11 @@ pushwatch range main~50..main                # a range
 pushwatch range --all                        # every commit on every branch
 pushwatch push --before <old> --after <new>  # what a push changed, incl. rewritten history
 pushwatch tree origin/feature                # a branch tip as a whole
+pushwatch --sarif out.sarif --summary-file out.md push --before <old> --after <new>
 pushwatch --repo /path/to/bare.git --json range --all
 ```
 
-The exit code is 1 when anything at or above `--fail-on` is found.
+The exit code is 1 when anything at or above the fail level is found, and 2 when the settings file is invalid.
 
 ## How it works
 
@@ -116,5 +165,5 @@ The exit code is 1 when anything at or above `--fail-on` is found.
 
 ```bash
 uv sync
-uv run pytest -q          # 23 tests, defanged copies of each attack shape plus git end-to-end cases
+uv run pytest -q          # 31 tests: defanged copies of each attack shape, git end-to-end cases, team settings, SARIF, audits
 ```

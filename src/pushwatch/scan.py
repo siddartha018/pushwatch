@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+from pushwatch.config import rule_config_change
 from pushwatch.gitio import Commit, Repo
 from pushwatch.rules import HIGH, MEDIUM, RANK, Finding, scan_change
 
@@ -21,6 +22,7 @@ class CommitReport:
     findings: list[Finding] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
     skipped: list[str] = field(default_factory=list)
+    allowed: list[tuple[Finding, object]] = field(default_factory=list)  # (finding, Allow) suppressed by settings
 
     @property
     def worst(self) -> str | None:
@@ -29,7 +31,8 @@ class CommitReport:
     def as_dict(self) -> dict:
         return {"sha": self.sha, "subject": self.subject, "author": self.author, "date": self.date,
                 "is_merge": self.is_merge, "worst": self.worst, "notes": self.notes,
-                "skipped": self.skipped, "findings": [f.as_dict() for f in self.findings]}
+                "skipped": self.skipped, "findings": [f.as_dict() for f in self.findings],
+                "allowed": [{**f.as_dict(), "reason": getattr(a, "reason", "")} for f, a in self.allowed]}
 
 
 def scan_commit(repo: Repo, sha: str) -> CommitReport:
@@ -39,6 +42,7 @@ def scan_commit(repo: Repo, sha: str) -> CommitReport:
         if fc.skipped:
             rep.skipped.append(f"{fc.path}: {fc.skipped}")
         rep.findings.extend(scan_change(fc))
+        rep.findings.extend(rule_config_change(fc))
     if rep.worst == HIGH:
         flagged = {f.path for f in rep.findings if f.severity == HIGH}
         if DOCS_MSG.search(c.subject) and not any(p.lower().endswith((".md", ".txt", ".rst")) for p in flagged):
@@ -64,6 +68,19 @@ class PushReport:
     def worst(self) -> str | None:
         sev = [c.worst for c in self.commits if c.worst] + ([HIGH] if self.rewritten else [])
         return max(sev, key=RANK.get, default=None)
+
+    def rewritten_findings(self) -> list[Finding]:
+        out = []
+        for r in self.rewritten:
+            for line in r["files_changed"][:20] or ["?"]:
+                path = line.split("\t")[-1]
+                out.append(Finding("rewritten-history", HIGH, path, None,
+                                   "A force-push replaced a commit with a look-alike that changed this file",
+                                   f"{r['replaced'][:10]} -> {r['by'][:10]} '{r['subject']}'"))
+        return out
+
+    def all_findings(self) -> list[Finding]:
+        return self.rewritten_findings() + [f for c in self.commits for f in c.findings]
 
     def as_dict(self) -> dict:
         return {"before": self.before, "after": self.after, "forced": self.forced, "worst": self.worst,

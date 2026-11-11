@@ -1,6 +1,6 @@
 [project]
 name = "pushwatch"
-version = "0.1.0"
+version = "0.2.0"
 description = "Catch malicious code in git pushes before it runs: VS Code autorun tasks, scripts disguised as fonts, code hidden in build configs, rewritten history."
 readme = "README.md"
 authors = [

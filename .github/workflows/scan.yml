@@ -1,0 +1,38 @@
+# Reusable workflow: one short file per repository (or one organization ruleset) turns pushwatch on.
+#
+#   jobs:
+#     pushwatch:
+#       uses: siddartha018/pushwatch/.github/workflows/scan.yml@v1
+#       permissions: { contents: read, pull-requests: write, security-events: write }
+name: pushwatch (reusable)
+on:
+  workflow_call:
+    inputs:
+      fail-on:
+        type: string
+        default: ""
+      comment:
+        type: boolean
+        default: true
+      sarif:
+        type: boolean
+        default: false
+    outputs:
+      result:
+        description: clean, warnings or blocked
+        value: ${{ jobs.scan.outputs.result }}
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    outputs:
+      result: ${{ steps.pushwatch.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: pushwatch
+        uses: siddartha018/pushwatch@v1
+        with:
+          fail-on: ${{ inputs.fail-on }}
+          comment: ${{ inputs.comment }}
+          sarif: ${{ inputs.sarif }}
