@@ -5,7 +5,7 @@ branding:
   color: red
 inputs:
   fail-on:
-    description: Lowest severity that fails the check (high, medium or low). Default: fail_on in .pushwatch.toml, else high.
+    description: "Lowest severity that fails the check (high, medium or low). Default: fail_on in .pushwatch.toml, else high."
     default: ""
   comment:
     description: Post one pull request comment with the findings, updated on every push (needs pull-requests write).
