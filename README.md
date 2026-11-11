@@ -37,7 +37,7 @@ Every commit on every branch of the 22 affected repositories was scanned, plus t
 | False alarms on a held-out set, scored once without changing any rule: 1,597 commits of React, Babel, SvelteKit and Nuxt | **0** |
 | Speed | 3,548 commits in 106 s on a laptop |
 
-The development set first had one false alarm: a webpack test config with the text `"spawn() from worker-lib"` inside a string. The rule now ignores code-like words inside strings. Since that 0 was reached after a fix, the held-out set is the fairer number.
+An audit of 161 real repositories found two more false alarms: repositories that commit `node_modules`, where library files such as `prettier/plugins/babel.js` matched the build-config pattern. Build configs now need `.config` in the name and vendored folders are skipped. The real-attack score is unchanged at 27/27. The development set first had one false alarm: a webpack test config with the text `"spawn() from worker-lib"` inside a string. The rule now ignores code-like words inside strings. Since that 0 was reached after a fix, the held-out set is the fairer number.
 
 What the scan also turned up:
 
@@ -165,5 +165,5 @@ The exit code is 1 when anything at or above the fail level is found, and 2 when
 
 ```bash
 uv sync
-uv run pytest -q          # 31 tests: defanged copies of each attack shape, git end-to-end cases, team settings, SARIF, audits
+uv run pytest -q          # 33 tests: defanged copies of each attack shape, git end-to-end cases, team settings, SARIF, audits
 ```
