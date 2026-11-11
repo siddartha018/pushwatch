@@ -92,12 +92,15 @@ def audit_owner(owner: str, cache: Path | None, history: bool = False, forks: bo
     started = time.time()
     results = []
     for r in list_repos(owner, forks, archived):
-        tmp = None if cache else Path(tempfile.mkdtemp(prefix="pushwatch-"))
+        tmp = None
         try:
+            tmp = None if cache else Path(tempfile.mkdtemp(prefix="pushwatch-"))
             path = mirror(r["url"] + ".git", (cache / owner if cache else tmp) / f"{r['name']}.git", history)
             results.append(audit_repo(path, r["name"], history))
         except subprocess.CalledProcessError as exc:
             results.append(RepoAudit(r["name"], error=(exc.stderr or b"").decode(errors="replace").strip()[:200] or str(exc)))
+        except OSError as exc:  # e.g. the disk filled up: record it and keep going
+            results.append(RepoAudit(r["name"], error=f"{type(exc).__name__}: {exc}"[:200]))
         finally:
             if tmp:
                 shutil.rmtree(tmp, ignore_errors=True)
