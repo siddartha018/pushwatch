@@ -137,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--owner", required=True); p.add_argument("--history", action="store_true")
     p.add_argument("--forks", action="store_true"); p.add_argument("--archived", action="store_true")
     p.add_argument("--cache", default=str(Path.home() / ".cache" / "pushwatch"))
+    p.add_argument("--no-cache", action="store_true", help="delete each download right after scanning it")
     a = ap.parse_args(argv)
 
     if a.cmd == "audit":
@@ -279,7 +280,7 @@ def _audit(a) -> int:
     from pushwatch.audit import audit_owner
 
     print(f"pushwatch audit of {a.owner}{' (with history)' if a.history else ''}")
-    results, secs = audit_owner(a.owner, Path(a.cache).expanduser(), a.history, a.forks, a.archived)
+    results, secs = audit_owner(a.owner, None if a.no_cache else Path(a.cache).expanduser(), a.history, a.forks, a.archived)
     live = [r for r in results if r.live]
     if a.json:
         print(json.dumps({"owner": a.owner, "seconds": round(secs, 1), "repos": [r.as_dict() for r in results]}, indent=2))

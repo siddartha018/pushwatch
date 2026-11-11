@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,16 +86,21 @@ def audit_repo(path: Path, name: str, history: bool = False) -> RepoAudit:
     return ra
 
 
-def audit_owner(owner: str, cache: Path, history: bool = False, forks: bool = False, archived: bool = False,
+def audit_owner(owner: str, cache: Path | None, history: bool = False, forks: bool = False, archived: bool = False,
                 progress=print) -> tuple[list[RepoAudit], float]:
+    """cache=None: download each repository to a temporary folder and delete it after scanning."""
     started = time.time()
     results = []
     for r in list_repos(owner, forks, archived):
+        tmp = None if cache else Path(tempfile.mkdtemp(prefix="pushwatch-"))
         try:
-            path = mirror(r["url"] + ".git", cache / owner / f"{r['name']}.git", history)
+            path = mirror(r["url"] + ".git", (cache / owner if cache else tmp) / f"{r['name']}.git", history)
             results.append(audit_repo(path, r["name"], history))
         except subprocess.CalledProcessError as exc:
             results.append(RepoAudit(r["name"], error=(exc.stderr or b"").decode(errors="replace").strip()[:200] or str(exc)))
+        finally:
+            if tmp:
+                shutil.rmtree(tmp, ignore_errors=True)
         a = results[-1]
         progress(f"  {a.name:40} {'error' if a.error else f'{a.branches} branches'}"
                  f"{'' if a.error else f', {a.live_high} live high' + (f', {len(a.history)} infected commits in history' if history else '')}")

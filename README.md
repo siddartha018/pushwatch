@@ -114,7 +114,7 @@ pushwatch audit --owner my-org             # the tip of every branch of every re
 pushwatch audit --owner my-org --history   # also every commit: when each payload arrived, and if it was cleaned up
 ```
 
-The audit lists repositories through the `gh` CLI, so it covers exactly what the signed-in account can see. It keeps bare mirrors in `~/.cache/pushwatch` and never checks anything out. Branch tips matter most, because cleanups usually fix the default branch and miss the others.
+The audit lists repositories through the `gh` CLI, so it covers exactly what the signed-in account can see. It keeps bare mirrors in `~/.cache/pushwatch` (or, with `--no-cache`, deletes each one right after scanning) and never checks anything out. Branch tips matter most, because cleanups usually fix the default branch and miss the others.
 
 ### Team settings
 
