@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+# benchmark output names private repositories; only the aggregate numbers go in the README
+bench/results*.json

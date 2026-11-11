@@ -1,0 +1,15 @@
+# Copy to .github/workflows/pushwatch.yml in any repository.
+name: pushwatch
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the scan compares each push with what it replaced
+      - uses: siddartha018/pushwatch@main

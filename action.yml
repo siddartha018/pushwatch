@@ -1,0 +1,25 @@
+name: pushwatch
+description: Catch malicious code in pushes and pull requests before it runs (VS Code autorun tasks, scripts disguised as fonts, code hidden in build configs, rewritten history).
+branding:
+  icon: shield
+  color: blue
+inputs:
+  fail-on:
+    description: Lowest severity that fails the check (high, medium or low)
+    default: high
+runs:
+  using: composite
+  steps:
+    - name: Fetch the commit a force-push replaced
+      shell: bash
+      run: |
+        before="${{ github.event.before }}"
+        if [ -n "$before" ] && ! echo "$before" | grep -qE '^0+$'; then
+          git cat-file -e "$before^{commit}" 2>/dev/null || git fetch --no-tags --quiet origin "$before" || echo "::notice title=pushwatch::could not fetch $before; comparing what is available"
+        fi
+    - name: Install pushwatch
+      shell: bash
+      run: python3 -m pip install --quiet --disable-pip-version-check "${{ github.action_path }}"
+    - name: Scan
+      shell: bash
+      run: pushwatch --fail-on "${{ inputs.fail-on }}" github

@@ -1,0 +1,20 @@
+[project]
+name = "pushwatch"
+version = "0.1.0"
+description = "Catch malicious code in git pushes before it runs: VS Code autorun tasks, scripts disguised as fonts, code hidden in build configs, rewritten history."
+readme = "README.md"
+authors = [
+    { name = "siddartha018", email = "147021873+siddartha018@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[project.scripts]
+pushwatch = "pushwatch.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["uv_build>=0.9.3,<0.10.0"]
+build-backend = "uv_build"
